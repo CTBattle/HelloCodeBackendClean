@@ -4,24 +4,16 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI, RateLimitError
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Initialize OpenAI client (API key is read automatically from environment variable)
-client = OpenAI()
-
-# Define request model
 class PromptRequest(BaseModel):
     prompt: str
     language: str
     useFString: bool = False
 
-# Initialize FastAPI app
 app = FastAPI()
 
-# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,7 +22,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Simple cooldown to avoid spamming
 last_request_time = 0
 cooldown_seconds = 1
 
@@ -54,7 +45,7 @@ async def generate_code(req: PromptRequest):
                 {"role": "user", "content": req.prompt}
             ]
         )
-        return {"code": response.choices[0].message.content.strip()}
+        return {"code": response.choices[0].message.content}
 
     except RateLimitError:
         return {"code": "# ⚠️ OpenAI rate limit hit.\nprint('Hello from HelloCode')"}
