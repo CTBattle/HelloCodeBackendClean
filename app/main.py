@@ -1,9 +1,9 @@
+import os
 import time
-from openai import OpenAI, RateLimitError
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-import os
+from openai import OpenAI, RateLimitError
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -23,7 +23,7 @@ app.add_middleware(
 )
 
 last_request_time = 0
-cooldown_seconds = 2
+cooldown_seconds = 1
 
 @app.post("/generate_code")
 async def generate_code(req: PromptRequest):
@@ -33,7 +33,7 @@ async def generate_code(req: PromptRequest):
         return {"error": "You're sending requests too quickly. Please wait a moment."}
     last_request_time = now
 
-    system_prompt = f"Generate {req.language} code for this: {req.prompt}"
+    system_prompt = f"Generate {req.language} code for this prompt: '{req.prompt}'"
     if req.language.lower() == "python" and req.useFString:
         system_prompt += " using Python f-strings"
 
@@ -48,7 +48,7 @@ async def generate_code(req: PromptRequest):
         return {"code": response.choices[0].message.content}
 
     except RateLimitError:
-        return {"code": "# ⚠️ OpenAI rate limit hit.\nprint('Hello from HelloCode!')"}
+        return {"code": "# ⚠️ OpenAI rate limit hit.\nprint('Hello from HelloCode')"}
 
     except Exception as e:
         return {"error": f"⚠️ Server error: {str(e)}"}
