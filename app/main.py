@@ -5,15 +5,19 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI, RateLimitError
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize OpenAI client (assumes OPENAI_API_KEY is set in the environment)
+client = OpenAI()
 
+# Request body model
 class PromptRequest(BaseModel):
     prompt: str
     language: str
     useFString: bool = False
 
+# Create FastAPI app
 app = FastAPI()
 
+# Allow all CORS origins (e.g., mobile/web frontend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Optional cooldown between requests
 last_request_time = 0
 cooldown_seconds = 1
 
@@ -33,6 +38,7 @@ async def generate_code(req: PromptRequest):
         return {"error": "You're sending requests too quickly. Please wait a moment."}
     last_request_time = now
 
+    # Build the system prompt
     system_prompt = f"Generate {req.language} code for this prompt: '{req.prompt}'"
     if req.language.lower() == "python" and req.useFString:
         system_prompt += " using Python f-strings"
