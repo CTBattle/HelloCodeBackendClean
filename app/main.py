@@ -1,13 +1,14 @@
 import os
 import time
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import openai
+from fastapi.middleware.cors import CORSMiddleware
+from openai import OpenAI
+from openai.types import CompletionUsage
+from openai import RateLimitError
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Define the request body structure
 class PromptRequest(BaseModel):
     prompt: str
     language: str
@@ -31,23 +32,22 @@ async def generate_code(req: PromptRequest):
     global last_request_time
     now = time.time()
     if now - last_request_time < cooldown_seconds:
-        return {"error": "You're sending requests too quickly. Please wait a moment."}
+        return {"error": "Too many requests. Please wait a moment."}
+    
     last_request_time = now
 
-    system_prompt = f"Generate {req.language} code for this prompt: '{req.prompt}'"
-    if req.language.lower() == "python" and req.useFString:
-        system_prompt += " using Python f-strings"
+    # Format user prompt
+    prompt = f"Write {req.language} code to: {req.prompt}"
+    if req.useFString and req.language.lower() == "python":
+        prompt += ". Use f-strings where possible."
 
     try:
-        chat = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": req.prompt}
-        ]
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=chat,
-            temperature=0.7,
+            messages=[{"role": "user", "content": prompt}],
         )
-        return {"response": response.choices[0].message["content"]}
+        return {"code": response.choices[0].message.content}
+    except RateLimitError:
+        return {"error": "Rate limit hit. Try again shortly."}
     except Exception as e:
         return {"error": str(e)}
