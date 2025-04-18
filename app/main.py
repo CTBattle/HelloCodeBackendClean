@@ -3,9 +3,10 @@ import time
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI, RateLimitError
+from openai import OpenAI
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# ✅ Use OpenAI without passing the key directly
+client = OpenAI()  # Assumes OPENAI_API_KEY is set in environment
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -46,9 +47,6 @@ async def generate_code(req: PromptRequest):
             ]
         )
         return {"code": response.choices[0].message.content}
-
-    except RateLimitError:
-        return {"code": "# ⚠️ OpenAI rate limit hit.\nprint('Hello from HelloCode')"}
-
+    
     except Exception as e:
         return {"error": f"⚠️ Server error: {str(e)}"}
