@@ -1,21 +1,23 @@
 import os
 import time
 from fastapi import FastAPI
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-import openai
+from pydantic import BaseModel
+from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
-# Set the OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Define the request body structure
 class PromptRequest(BaseModel):
     prompt: str
     language: str
     useFString: bool = False
 
+# Initialize FastAPI app
 app = FastAPI()
 
-# Enable CORS for all origins (helpful for web/mobile)
+# Enable CORS for all origins (for mobile/web testing)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Cooldown timer (optional)
 last_request_time = 0
 cooldown_seconds = 1
 
@@ -32,25 +35,24 @@ async def generate_code(req: PromptRequest):
     global last_request_time
     now = time.time()
     if now - last_request_time < cooldown_seconds:
-        return {"error": "⏳ Too fast. Wait a second."}
+        return {"error": "You're sending requests too quickly. Please wait a moment."}
     last_request_time = now
 
-    system_prompt = f"Generate {req.language} code for this: {req.prompt}"
+    # Build system prompt
+    system_prompt = f"Generate {req.language} code for this prompt: '{req.prompt}'"
     if req.language.lower() == "python" and req.useFString:
-        system_prompt += " using f-strings"
+        system_prompt += " using Python f-strings"
 
     try:
-        response = openai.ChatCompletion.create(
+        chat: list[ChatCompletionMessageParam] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": req.prompt}
+        ]
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": req.prompt}
-            ]
+            messages=chat,
+            temperature=0.7,
         )
-        return {"code": response.choices[0].message["content"]}
-
-    except openai.error.OpenAIError as e:
-        return {"error": f"OpenAI error: {str(e)}"}
-
+        return {"response": response.choices[0].message.content}
     except Exception as e:
-        return {"error": f"Server error: {str(e)}"}
+        return {"error": str(e)}
